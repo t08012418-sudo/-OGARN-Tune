@@ -22,7 +22,7 @@ main{padding:16px}.banner{padding:18px;border:1px solid var(--line);border-radiu
 .toolbar{display:flex;align-items:center;gap:8px;margin-bottom:8px}.toolbar h2{font-size:17px;margin:0}.toolbar .spacer{flex:1}.table-wrap{overflow:auto;border-radius:12px;border:1px solid #ffffff14;max-height:65vh}.map{border-collapse:separate;border-spacing:1px;min-width:505px;width:max-content}.map th,.map td{height:42px;min-width:67px;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}.map th:first-child,.map td:first-child{min-width:82px;position:sticky;left:0;z-index:2;background:#111625}.map th{background:#ffffff10}.cell{width:100%;height:42px;border:0;color:white;font-weight:800}.hint{padding:10px 2px;color:var(--muted);font-size:12px}
 .form{background:#ffffff08;border-radius:14px;padding:4px 14px}.row{padding:15px 0;border-bottom:1px solid #ffffff12}.row:last-child{border-bottom:0}.label{font-weight:800}.value{color:var(--muted);font-size:13px;margin-top:4px}
 .empty{padding:25px 0;color:var(--muted);text-align:center}
-input[type=file]{display:none}
+.live-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}.back-btn{border:1px solid #ffffff22;background:#ffffff0b;color:white;border-radius:12px;padding:9px 12px;font-weight:800}.live-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.live-card{padding:14px;border-radius:14px;background:#ffffff0a;border:1px solid #ffffff18}.live-label{font-size:11px;color:var(--muted);font-weight:700}.live-value{font-size:24px;font-weight:900;margin-top:5px}.live-unit{font-size:11px;color:var(--muted);margin-left:4px}.live-actions{display:flex;gap:8px;margin:14px 0}.live-actions button{flex:1;border:0;border-radius:12px;padding:12px;font-weight:900}.start{background:var(--green);color:#062012}.stop{background:#ff637c;color:#240009}.ecu-state{padding:12px;border-radius:12px;background:#ffffff08;border:1px solid #ffffff12;margin-bottom:12px}.bar{height:8px;border-radius:999px;background:#ffffff12;overflow:hidden;margin-top:7px}.bar i{display:block;height:100%;width:0;background:var(--cyan);transition:width .2s}.warn{font-size:11px;color:#ffcc66;margin-top:10px;line-height:1.5}input[type=file]{display:none}
 </style>
 </head>
 <body>
@@ -44,7 +44,9 @@ input[type=file]{display:none}
 <input id="fileInput" type="file" accept=".bin,.hex,.dat,.rom,.bin,*/*">
 
 <script>
-const state={tab:0,fileName:"ยังไม่ได้เลือกไฟล์",status:"พร้อมใช้งาน"};
+const state={tab:0,view:"home",fileName:"ยังไม่ได้เลือกไฟล์",status:"พร้อมใช้งาน",live:false};
+let liveTimer=null;
+const liveData={rpm:0,tps:0,temp:0,afr:0,batt:0,speed:0,map:0};
 const cols=["0.8","1.0","1.2","1.4","1.6","1.8"];
 const rpms=[800,1100,1200,1500,1800,2200,2600,3000];
 const rows=rpms.map(r=>({label:r,values:cols.map((_,i)=>+(2.80+((Math.floor(r/100)+i*3)%13)*.07).toFixed(2))}));
@@ -59,7 +61,7 @@ ${card("🔴","ตรวจสอบ ECU","red",()=>{state.status="โหมด�
 ${card("⛽","วิเคราะห์น้ำมัน","cyan",()=>setTab(1))}
 ${card("⚡","RACE BOX","purple",()=>{state.status="เปิด RACE BOX (จำลอง)";render()})}
 ${card("▣","RACE CAM","purple",()=>{state.status="เปิด RACE CAM (จำลอง)";render()})}
-${card("〰","Live Data","green",()=>{state.status="Live Data (จำลอง)";render()})}
+${card("〰","Live Data","green",openLiveData)}
 ${card("⌖","Speed GPS","orange",()=>{state.status="GPS (จำลอง)";render()})}
 ${card("☷","จูนหัวฉีด","pink",()=>setTab(1))}
 ${card("⚙","ตั้งค่า","gray",()=>setTab(2))}
@@ -68,6 +70,41 @@ ${card("⚙","ตั้งค่า","gray",()=>setTab(2))}
 <div class="file"><div class="ico cyan">▣</div><div class="file-info"><div class="file-name">${esc(state.fileName)}</div><div class="status">${esc(state.status)}</div></div><div class="spacer"></div><button onclick="document.getElementById('fileInput').click()">เปิด BIN</button></div>`;
 }
 function card(icon,title,color,fn){const id="a"+Math.random().toString(36).slice(2);window[id]=fn;setTimeout(()=>document.getElementById(id)?.addEventListener("click",window[id]),0);return `<button class="card" id="${id}"><span class="ico ${color}">${icon}</span><b>${title}</b></button>`}
+function openLiveData(){state.view="live";state.live=false;stopLive();render();}
+function startLive(){state.live=true;state.status="Live Data กำลังทำงาน (จำลอง)";updateLive();stopLive();liveTimer=setInterval(updateLive,700);render();}
+function stopLive(){if(liveTimer){clearInterval(liveTimer);liveTimer=null;}state.live=false;}
+function updateLive(){
+  const t=Date.now()/1000;
+  liveData.rpm=Math.round(1100+650*Math.sin(t*1.15)+220*Math.sin(t*2.7));
+  liveData.rpm=Math.max(800,Math.min(3500,liveData.rpm));
+  liveData.tps=+(18+12*Math.sin(t*.9)).toFixed(1);
+  liveData.temp=+(82+5*Math.sin(t*.35)).toFixed(1);
+  liveData.afr=+(14.2+0.45*Math.sin(t*1.3)).toFixed(2);
+  liveData.batt=+(13.7+0.18*Math.sin(t*.7)).toFixed(2);
+  liveData.speed=Math.max(0,Math.round(38+12*Math.sin(t*.55)));
+  liveData.map=+(38+8*Math.sin(t*1.05)).toFixed(1);
+  if(state.view==="live") renderLiveValues();
+}
+function renderLiveValues(){
+  const set=(id,v)=>{const e=document.getElementById(id);if(e)e.textContent=v;};
+  set("v-rpm",liveData.rpm);set("v-tps",liveData.tps);set("v-temp",liveData.temp);set("v-afr",liveData.afr);set("v-batt",liveData.batt);set("v-speed",liveData.speed);set("v-map",liveData.map);
+  const bar=document.getElementById("rpm-bar");if(bar)bar.style.width=Math.min(100,liveData.rpm/35)+"%";
+}
+function liveView(){
+  return `<div class="live-head"><button class="back-btn" onclick="stopLive();state.view=\"home\";render()">‹ กลับ</button><div><h2 style="margin:0;font-size:19px">LIVE DATA</h2><div class="muted">ค่าจำลองแบบเรียลไทม์</div></div></div>
+  <div class="ecu-state"><b>${state.live?"● LIVE DATA RUNNING":"● พร้อมเริ่ม"}</b><div class="muted" style="margin-top:4px">สถานะ ECU: DEMO / ยังไม่ได้เชื่อมต่อ ECU จริง</div><div class="bar"><i id="rpm-bar"></i></div></div>
+  <div class="live-grid">
+    <div class="live-card"><div class="live-label">RPM</div><div class="live-value"><span id="v-rpm">${liveData.rpm}</span><span class="live-unit">rpm</span></div></div>
+    <div class="live-card"><div class="live-label">TPS</div><div class="live-value"><span id="v-tps">${liveData.tps}</span><span class="live-unit">%</span></div></div>
+    <div class="live-card"><div class="live-label">ENGINE TEMP</div><div class="live-value"><span id="v-temp">${liveData.temp}</span><span class="live-unit">°C</span></div></div>
+    <div class="live-card"><div class="live-label">AFR</div><div class="live-value"><span id="v-afr">${liveData.afr}</span></div></div>
+    <div class="live-card"><div class="live-label">BATTERY</div><div class="live-value"><span id="v-batt">${liveData.batt}</span><span class="live-unit">V</span></div></div>
+    <div class="live-card"><div class="live-label">SPEED</div><div class="live-value"><span id="v-speed">${liveData.speed}</span><span class="live-unit">km/h</span></div></div>
+    <div class="live-card"><div class="live-label">MAP</div><div class="live-value"><span id="v-map">${liveData.map}</span><span class="live-unit">kPa</span></div></div>
+  </div>
+  <div class="live-actions"><button class="start" onclick="startLive()">▶ START</button><button class="stop" onclick="stopLive();state.status=\"Live Data หยุดแล้ว\";render()">■ STOP</button></div>
+  <div class="warn">ข้อมูลบนหน้านี้เป็นข้อมูลจำลองเพื่อทดสอบหน้าจอเท่านั้น ยังไม่ได้อ่านค่าจาก ECU หรืออุปกรณ์ภายนอกจริง</div>`;
+}
 function mapView(){
 let head=`<div class="toolbar"><div><h2>MAP EDITOR</h2><div class="muted">ตัวอย่างตารางจูน • ยังไม่เขียนลง ECU</div></div><div class="spacer"></div><button class="primary" onclick="saveMap()">บันทึก</button></div>`;
 let table=`<div class="table-wrap"><table class="map"><thead><tr><th>RPM / LOAD</th>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead><tbody>`;
@@ -78,8 +115,8 @@ function cellColor(v){let t=Math.max(0,Math.min(1,v/20));let r=Math.round(8+5*t)
 function inc(r,c){rows[r].values[c]=Math.min(20,+(rows[r].values[c]+.10).toFixed(2));state.status=`แก้ไข ${rows[r].label} RPM / LOAD ${cols[c]}`;render()}
 function saveMap(){state.status="บันทึก Map แล้ว (โหมดจำลอง)";render()}
 function settings(){return `<div class="section-title">ตั้งค่า</div><div class="form"><div class="row"><div class="label">รถ / ECU</div><div class="value">Demo Vehicle<br>Demo ECU — ไม่เชื่อมต่ออุปกรณ์</div></div><div class="row"><div class="label">ระบบ</div><div class="value">OGARN จูน V1<br>BIN/XDF และการสื่อสาร ECU จะเพิ่มในเวอร์ชันถัดไป</div></div></div>`}
-function render(){document.getElementById("main").innerHTML=state.tab===0?home():state.tab===1?mapView():settings();document.querySelectorAll(".tab").forEach((b,i)=>b.classList.toggle("active",i===state.tab));}
-document.querySelectorAll(".tab").forEach((b,i)=>b.onclick=()=>setTab(i));
+function render(){document.getElementById("main").innerHTML=state.view==="live"?liveView():(state.tab===0?home():state.tab===1?mapView():settings());document.querySelectorAll(".tab").forEach((b,i)=>b.classList.toggle("active",i===state.tab));if(state.view==="live")renderLiveValues();}
+document.querySelectorAll(".tab").forEach((b,i)=>b.onclick=()=>{stopLive();state.view="home";setTab(i);});
 document.getElementById("fileInput").onchange=e=>{const f=e.target.files[0];if(f){state.fileName=f.name;state.status=`เปิดไฟล์แล้ว: ${f.name}`;render();}};
 render();
 if("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(()=>{});
